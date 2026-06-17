@@ -1,0 +1,9 @@
+odoo_ai_env/
+__pycache__/
+*.pyc
+.env
+.idea/
+.vscode/
+*.log
+chroma/persist/
+data/conversations/
