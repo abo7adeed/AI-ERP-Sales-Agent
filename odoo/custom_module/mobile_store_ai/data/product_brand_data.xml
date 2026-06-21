@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="brand_apple" model="product.brand">
+            <field name="name">Apple</field>
+            <field name="code">APPLE</field>
+            <field name="description">Apple iPhones - premium iOS smartphones</field>
+            <field name="website">https://www.apple.com</field>
+        </record>
+        <record id="brand_samsung" model="product.brand">
+            <field name="name">Samsung</field>
+            <field name="code">SAMSUNG</field>
+            <field name="description">Samsung Galaxy series - Android smartphones</field>
+            <field name="website">https://www.samsung.com</field>
+        </record>
+        <record id="brand_xiaomi" model="product.brand">
+            <field name="name">Xiaomi</field>
+            <field name="code">XIAOMI</field>
+            <field name="description">Xiaomi Redmi and flagship devices</field>
+            <field name="website">https://www.mi.com</field>
+        </record>
+        <record id="brand_realme" model="product.brand">
+            <field name="name">Realme</field>
+            <field name="code">REALME</field>
+            <field name="description">Realme - performance-focused smartphones</field>
+            <field name="website">https://www.realme.com</field>
+        </record>
+        <record id="brand_oppo" model="product.brand">
+            <field name="name">Oppo</field>
+            <field name="code">OPPO</field>
+            <field name="description">Oppo - camera-centric smartphones</field>
+            <field name="website">https://www.oppo.com</field>
+        </record>
+        <record id="brand_honor" model="product.brand">
+            <field name="name">Honor</field>
+            <field name="code">HONOR</field>
+            <field name="description">Honor smartphones - premium design</field>
+            <field name="website">https://www.hihonor.com</field>
+        </record>
+        <record id="brand_vivo" model="product.brand">
+            <field name="name">Vivo</field>
+            <field name="code">VIVO</field>
+            <field name="description">Vivo - professional camera tuning</field>
+            <field name="website">https://www.vivo.com</field>
+        </record>
+    </data>
+</odoo>

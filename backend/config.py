@@ -21,11 +21,11 @@ MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "local").lower()
 
 # Local Ollama Configuration
 LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:11434/api/generate")
-LOCAL_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen2.5:1.5b")
+LOCAL_MODEL_NAME = os.getenv("LOCAL_MODEL_NAME", "qwen2.5:1.5b")
 
 # Cloud Providers Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama3-8b-8192")
+GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.1-8b-instant")

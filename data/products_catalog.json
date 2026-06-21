@@ -1,0 +1,92 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "iPhone 14 Pro",
+      "description": "أحدث آيفون بمعالج A16 وكاميرا احترافية",
+      "metadata": {
+        "price": "5000 جنيه",
+        "stock": 10,
+        "category": "Premium",
+        "specs": "128GB, 6GB RAM, Screen 6.1 بوصة"
+      }
+    },
+    {
+      "id": 2,
+      "name": "iPhone 13",
+      "description": "آيفون عملي وموثوق بسعر معقول",
+      "metadata": {
+        "price": "3500 جنيه",
+        "stock": 15,
+        "category": "Mid-range",
+        "specs": "128GB, 4GB RAM, Screen 6.1 بوصة"
+      }
+    },
+    {
+      "id": 3,
+      "name": "Samsung Galaxy S23",
+      "description": "أقوى هاتف أندرويد مع معالج Snapdragon 8 Gen 2",
+      "metadata": {
+        "price": "4500 جنيه",
+        "stock": 8,
+        "category": "Premium",
+        "specs": "256GB, 8GB RAM, Screen 6.1 بوصة"
+      }
+    },
+    {
+      "id": 4,
+      "name": "Samsung Galaxy A13",
+      "description": "هاتف ذكي بسعر منخفض للاستخدام اليومي",
+      "metadata": {
+        "price": "1500 جنيه",
+        "stock": 25,
+        "category": "Budget",
+        "specs": "64GB, 4GB RAM, Screen 6.6 بوصة"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Google Pixel 7",
+      "description": "كاميرا مميزة والذكاء الاصطناعي في التصوير",
+      "metadata": {
+        "price": "4000 جنيه",
+        "stock": 5,
+        "category": "Premium",
+        "specs": "128GB, 8GB RAM, Screen 6.3 بوصة"
+      }
+    },
+    {
+      "id": 6,
+      "name": "Xiaomi 12",
+      "description": "قيمة ممتازة مع شاشة AMOLED سائلة",
+      "metadata": {
+        "price": "3000 جنيه",
+        "stock": 12,
+        "category": "Mid-range",
+        "specs": "256GB, 8GB RAM, Screen 6.28 بوصة"
+      }
+    },
+    {
+      "id": 7,
+      "name": "OnePlus 11",
+      "description": "أداء سريع وشحن فائق السرعة",
+      "metadata": {
+        "price": "3800 جنيه",
+        "stock": 7,
+        "category": "Mid-range",
+        "specs": "256GB, 12GB RAM, Screen 6.7 بوصة"
+      }
+    },
+    {
+      "id": 8,
+      "name": "Oppo Reno 8",
+      "description": "تصميم عصري مع كاميرا خلفية قوية",
+      "metadata": {
+        "price": "2800 جنيه",
+        "stock": 9,
+        "category": "Mid-range",
+        "specs": "128GB, 8GB RAM, Screen 6.43 بوصة"
+      }
+    }
+  ]
+}

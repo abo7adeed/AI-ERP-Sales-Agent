@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_brand_tree" model="ir.ui.view">
+        <field name="name">product.brand.tree</field>
+        <field name="model">product.brand</field>
+        <field name="arch" type="xml">
+            <tree string="Mobile Brands">
+                <field name="name" string="Brand" />
+                <field name="code" string="Code" />
+                <field name="product_count" string="Products" />
+                <field name="website" string="Website" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_product_brand_form" model="ir.ui.view">
+        <field name="name">product.brand.form</field>
+        <field name="model">product.brand</field>
+        <field name="arch" type="xml">
+            <form string="Mobile Brand">
+                <sheet>
+                    <div class="oe_button_box" name="button_box" />
+                    <group>
+                        <group>
+                            <field name="name" />
+                            <field name="code" />
+                            <field name="website" />
+                        </group>
+                        <group>
+                            <field name="logo" widget="image" />
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_product_brand_search" model="ir.ui.view">
+        <field name="name">product.brand.search</field>
+        <field name="model">product.brand</field>
+        <field name="arch" type="xml">
+            <search string="Search Brands">
+                <field name="name" />
+                <field name="code" />
+            </search>
+        </field>
+    </record>
+
+    <record id="action_product_brand" model="ir.actions.act_window">
+        <field name="name">Mobile Brands</field>
+        <field name="res_model">product.brand</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p>Manage mobile phone brands.</p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_product_brand"
+        name="Mobile Brands"
+        parent="sales_team.menu_sale_config"
+        action="action_product_brand"
+        sequence="20"
+    />
+</odoo>

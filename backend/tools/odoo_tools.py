@@ -5,16 +5,32 @@ from backend.config import ODOO_DB, ODOO_PASSWORD, ODOO_URL, ODOO_USERNAME
 
 logger = logging.getLogger(__name__)
 
-# Connect to Odoo 17 via XML-RPC
-common = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/common")
-uid = common.authenticate(ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD, {})
-models = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/object")
+# Lazy initialization of Odoo connection
+_uid = None
+_models = None
 
-logger.info("Connected to Odoo at %s db=%s uid=%s", ODOO_URL, ODOO_DB, uid)
+
+def _get_odoo_connection():
+	"""Lazy-load Odoo connection on first use."""
+	global _uid, _models
+
+	if _uid is None or _models is None:
+		logger.info("Initializing Odoo connection to %s db=%s", ODOO_URL, ODOO_DB)
+		try:
+			common = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/common")
+			_uid = common.authenticate(ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD, {})
+			_models = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/object")
+			logger.info("Connected to Odoo at %s db=%s uid=%s", ODOO_URL, ODOO_DB, _uid)
+		except Exception as e:
+			logger.exception("Failed to connect to Odoo: %s", e)
+			raise
+
+	return _uid, _models
 
 def check_stock_and_prices():
     """Fetch available products, prices, and specs from Odoo"""
     logger.debug("Fetching saleable products from Odoo")
+    uid, models = _get_odoo_connection()
     product_ids = models.execute_kw(
         ODOO_DB, uid, ODOO_PASSWORD, "product.product", "search", [[["sale_ok", "=", True]]]
     )
@@ -25,7 +41,11 @@ def check_stock_and_prices():
         "product.product",
         "read",
         [product_ids],
-        {"fields": ["name", "list_price", "qty_available", "description_sale"]},
+        {"fields": [
+            "name", "list_price", "qty_available", "description_sale",
+            "display_specs", "brand_id", "ram", "storage",
+            "processor", "camera", "battery", "color",
+        ]},
     )
     logger.info("Fetched %d products from Odoo", len(phones))
     return phones
@@ -33,6 +53,7 @@ def check_stock_and_prices():
 def search_or_create_customer(name: str, phone: str) -> int:
     """Lookup customer by phone, create a new record if not found"""
     logger.info("Searching customer by phone=%s", phone)
+    uid, models = _get_odoo_connection()
     customer_ids = models.execute_kw(
         ODOO_DB, uid, ODOO_PASSWORD, "res.partner", "search", [[["phone", "=", phone]]]
     )
@@ -61,6 +82,7 @@ def create_sales_quotation(customer_id: int, product_id: int, qty: int = 1) -> s
             product_id,
             qty,
         )
+        uid, models = _get_odoo_connection()
         order_id = models.execute_kw(
             ODOO_DB,
             uid,

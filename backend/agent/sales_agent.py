@@ -3,15 +3,19 @@ import logging
 import requests
 
 import backend.config as config
+from backend.agent.conversation_manager import (
+    add_message,
+    format_history_for_prompt,
+    get_history,
+)
 from backend.agent.intent_detector import has_booking_intent
 from backend.agent.json_parser import extract_action_json
 from backend.agent.product_matcher import find_product_in_message
 from backend.agent.prompts import SALES_AGENT_PROMPT_TEMPLATE
-from backend.tools.odoo_tools import (
-    check_stock_and_prices,
-    create_sales_quotation,
-    search_or_create_customer,
-)
+from backend.services.odoo_service import OdooService
+from backend.services.customer_service import CustomerService
+from backend.services.order_service import OrderService
+from backend.rag.retriever import ProductRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -82,13 +86,13 @@ def call_llm_provider(system_prompt: str, user_message: str, provider: str) -> s
     raise ValueError(f"Unknown MODEL_PROVIDER: {provider}")
 
 
-def _build_inventory_context(phones_data: list[dict]) -> str:
+def _build_inventory_context(products: list) -> str:
     context = "الموبايلات المتاحة في المخزن حالياً:\n"
-    for phone in phones_data:
-        specs = phone.get("description_sale") or "لا توجد مواصفات"
+    for phone in products:
+        specs = phone.display_specs or phone.description_sale or "لا توجد مواصفات"
         context += (
-            f"- الموبايل: {phone['name']} | المعرف (ID): {phone['id']} | "
-            f"السعر: {phone['list_price']} جنيه | المتاح: {int(phone['qty_available'])} أجهزة | "
+            f"- الموبايل: {phone.name} | المعرف (ID): {phone.id} | "
+            f"السعر: {phone.list_price} جنيه | المتاح: {int(phone.qty_available)} أجهزة | "
             f"المواصفات: {specs}\n"
         )
     return context
@@ -110,38 +114,89 @@ def _handle_create_order(action_data: dict, customer_name: str, customer_phone: 
         customer_phone,
         product_id,
     )
-    customer_id = search_or_create_customer(customer_name, customer_phone)
-    logger.info("Resolved customer_id=%s", customer_id)
 
-    order_name = create_sales_quotation(customer_id, product_id, qty=1)
-    logger.info("Created quotation: %s", order_name)
+    try:
+        # Use service layer to create customer and order
+        customer = CustomerService.get_or_create_customer(customer_name, customer_phone)
+        logger.info("Customer resolved: id=%d", customer.id)
 
-    if isinstance(order_name, str) and order_name.startswith("Error creating quotation"):
-        logger.error("Odoo quotation creation failed: %s", order_name)
-        return f"❌ {order_name}"
+        # Validate order before creation
+        is_valid, error_msg = OrderService.validate_order(customer.id, product_id, quantity=1)
+        if not is_valid:
+            logger.error("Order validation failed: %s", error_msg)
+            return f"❌ عذراً، {error_msg}"
 
-    return f"{reply_text} (تم تسجيل طلبك في أودو برقم: {order_name} 📝)"
+        # Create order
+        order = OrderService.create_order(customer.id, product_id, quantity=1)
+        logger.info("Created quotation: %s", order.name)
+
+        return f"{reply_text} (تم تسجيل طلبك في أودو برقم: {order.name} 📝)"
+
+    except ValueError as exc:
+        logger.error("Order creation error: %s", exc)
+        return f"❌ {str(exc)}"
+    except Exception as exc:
+        logger.exception("Unexpected error creating order")
+        return f"❌ عذراً، حدث خطأ غير متوقع: {exc}"
 
 
-def run_sales_agent(user_message: str, customer_name: str, customer_phone: str, provider: str) -> str:
+def run_sales_agent(
+    user_message: str,
+    customer_name: str,
+    customer_phone: str,
+    provider: str,
+    user_id: str = None,
+) -> str:
+    """
+    Run the sales agent with conversation memory and RAG.
+
+    Args:
+        user_message: The current user message
+        customer_name: Customer's name
+        customer_phone: Customer's phone
+        provider: LLM provider ("local", "groq", "gemini")
+        user_id: Optional unique user identifier for conversation memory (defaults to customer_phone)
+    """
+    # Use customer_phone as user_id if not provided
+    if user_id is None:
+        user_id = customer_phone
+
     logger.info(
-        "Running sales agent for customer=%s phone=%s message=%s",
+        "Running sales agent for customer=%s phone=%s user_id=%s message=%s",
         customer_name,
         customer_phone,
+        user_id,
         user_message,
     )
 
     try:
-        phones_data = check_stock_and_prices()
-        logger.info("Loaded %d products from Odoo inventory", len(phones_data))
+        products = OdooService.get_products()
+        logger.info("Loaded %d products from Odoo inventory", len(products))
     except Exception as exc:
         logger.exception("Failed to load inventory from Odoo")
         return f"Error connecting to Odoo inventory: {exc}"
 
-    context = _build_inventory_context(phones_data)
+    context = _build_inventory_context(products)
+
+    # Retrieve and format conversation history
+    history = get_history(user_id, limit=5)
+    history_context = format_history_for_prompt(history)
+    logger.debug("Retrieved %d messages from conversation history for user_id=%s", len(history), user_id)
+
+    # Retrieve relevant products using RAG
+    rag_context = ""
+    try:
+        rag_results = ProductRetriever.retrieve(user_message, limit=3)
+        rag_context = ProductRetriever.format_results_for_prompt(rag_results)
+        logger.debug("RAG retrieved %d products", len(rag_results))
+    except Exception as exc:
+        logger.warning("RAG retrieval failed (non-critical): %s", exc)
+        # RAG is optional, continue without it
 
     try:
         system_prompt = SALES_AGENT_PROMPT_TEMPLATE.format(context=context)
+        # Inject conversation history and RAG results into the system prompt
+        system_prompt = system_prompt + history_context + rag_context
     except KeyError as exc:
         logger.exception("Prompt template formatting failed")
         return f"Error preparing agent prompt: {exc}"
@@ -153,11 +208,34 @@ def run_sales_agent(user_message: str, customer_name: str, customer_phone: str, 
         logger.exception("LLM provider call failed")
         return f"Error connecting to LLM Agent: {exc}"
 
+    # Save the user message and AI response to conversation history
+    add_message(user_id, "user", user_message)
+    add_message(user_id, "assistant", ai_reply)
+
     action_data = extract_action_json(ai_reply)
     if action_data and action_data.get("action") == "create_order":
         return _handle_create_order(action_data, customer_name, customer_phone)
 
     if has_booking_intent(user_message):
+        # Convert Product objects to dict format for compatibility with find_product_in_message
+        phones_data = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "list_price": p.list_price,
+                "qty_available": p.qty_available,
+                "description_sale": p.description_sale,
+                "display_specs": p.display_specs,
+                "brand_id": p.brand_id,
+                "ram": p.ram,
+                "storage": p.storage,
+                "processor": p.processor,
+                "camera": p.camera,
+                "battery": p.battery,
+                "color": p.color,
+            }
+            for p in products
+        ]
         matched_product = find_product_in_message(user_message, phones_data)
         if matched_product:
             logger.info(

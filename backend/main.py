@@ -4,9 +4,10 @@ import os
 
 import requests
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel
 from typing import Optional
-
+from dotenv import load_dotenv
+load_dotenv()
+from backend.models.api import ChatRequest, ChatResponse, WebhookResponse
 from backend.agent.sales_agent import run_sales_agent
 
 logging.basicConfig(
@@ -20,17 +21,11 @@ app = FastAPI(title="Mobile Store AI Telegram Assistant")
 # Telegram Token from .env
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-class ChatRequest(BaseModel):
-    message: str
-    customer_name: str
-    customer_phone: str
-    provider: Optional[str] = "local"
-
 @app.get("/")
 def read_root():
     return {"status": "online", "message": "FastAPI backend is running successfully"}
 
-@app.post("/api/chat")
+@app.post("/api/chat", response_model=ChatResponse)
 def chat_endpoint(request: ChatRequest):
     try:
         logger.info(
@@ -45,7 +40,7 @@ def chat_endpoint(request: ChatRequest):
             provider=request.provider,
         )
         logger.info("Chat response generated successfully")
-        return {"response": response}
+        return ChatResponse(response=response, status="success")
     except Exception as e:
         logger.exception("Chat endpoint failed")
         raise HTTPException(status_code=500, detail=str(e))
@@ -71,16 +66,18 @@ def send_telegram_message(chat_id: int, text: str):
     except Exception as e:
         logger.exception("Error sending Telegram message to chat_id=%s", chat_id)
 
-@app.post("/api/telegram/webhook")
+@app.post("/api/telegram/webhook", response_model=WebhookResponse)
 async def telegram_webhook(request: Request):
     """Handle incoming Telegram messages"""
+    provider = os.getenv("MODEL_PROVIDER", "local")
+    logger.info("🔥 MODEL_PROVIDER from env = %s", provider)
     try:
         body = await request.json()
         logger.debug("Received Telegram payload: %s", json.dumps(body, ensure_ascii=False))
 
         if "message" not in body:
             logger.info("Telegram update ignored: no message field")
-            return {"status": "ignored"}
+            return WebhookResponse(status="ignored")
 
         msg = body["message"]
         chat_id = msg["chat"]["id"]
@@ -102,13 +99,13 @@ async def telegram_webhook(request: Request):
             user_message=user_message,
             customer_name=customer_name,
             customer_phone=customer_phone,
-            provider="local",
+            provider=provider,
         )
 
         send_telegram_message(chat_id, ai_response)
 
-        return {"status": "success"}
+        return WebhookResponse(status="success")
 
     except Exception as e:
         logger.exception("Telegram webhook error")
-        return {"status": "error", "detail": str(e)}
+        return WebhookResponse(status="error", detail=str(e))

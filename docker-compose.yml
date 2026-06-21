@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mobile_ai_bot_api
+    ports:
+      - "8000:8000"
+    environment:
+      - ODOO_URL=${ODOO_URL:-http://odoo:8069}
+      - ODOO_DB=${ODOO_DB:-odoo_db}
+      - ODOO_USERNAME=${ODOO_USERNAME:-admin}
+      - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - LOCAL_LLM_URL=${LOCAL_LLM_URL:-http://localhost:11434/api/generate}
+      - LOCAL_MODEL_NAME=${LOCAL_MODEL_NAME:-mistral}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL_NAME=${GROQ_MODEL_NAME:-mixtral-8x7b-32768}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL_NAME=${GEMINI_MODEL_NAME:-gemini-pro}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/app/data
+      - ./backend:/app/backend
+    depends_on:
+      - postgres
+      - chromadb
+    networks:
+      - mobile_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database (for Odoo or application data)
+  postgres:
+    image: postgres:15-alpine
+    container_name: mobile_ai_bot_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-odoo}
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odoo_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mobile_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-odoo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (Optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: mobile_ai_bot_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mobile_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ChromaDB Vector Database
+  chromadb:
+    image: chromadb/chroma:0.4.0
+    container_name: mobile_ai_bot_chromadb
+    ports:
+      - "8001:8000"
+    environment:
+      - CHROMA_PORT=8000
+    volumes:
+      - chromadb_data:/chroma/chroma
+    networks:
+      - mobile_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Ollama for Local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mobile_ai_bot_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    networks:
+      - mobile_network
+    restart: unless-stopped
+    profiles:
+      - with-ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: mobile_ai_bot_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - fastapi
+    networks:
+      - mobile_network
+    restart: unless-stopped
+    profiles:
+      - with-nginx
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  chromadb_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+networks:
+  mobile_network:
+    driver: bridge
+
+# Usage:
+# ------
+# Basic startup (FastAPI + PostgreSQL + ChromaDB):
+#   docker-compose up
+#
+# With Ollama for local LLM:
+#   docker-compose --profile with-ollama up
+#
+# With Nginx reverse proxy:
+#   docker-compose --profile with-nginx up
+#
+# All services:
+#   docker-compose --profile with-ollama --profile with-nginx up
+#
+# Stop services:
+#   docker-compose down
+#
+# Remove volumes:
+#   docker-compose down -v
